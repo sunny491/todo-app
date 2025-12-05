@@ -24,13 +24,16 @@
 <div id="taskList"></div>
 
 <script>
-    const API_URL = "http://localhost:8080/api/todos";
     let allTasks = [];
 
-    async function loadTasks() {
-        const res = await fetch(API_URL);
-        allTasks = await res.json();
+    function loadTasks() {
+        const saved = localStorage.getItem("tasks");
+        allTasks = saved ? JSON.parse(saved) : [];
         renderTasks();
+    }
+
+    function saveTasks() {
+        localStorage.setItem("tasks", JSON.stringify(allTasks));
     }
 
     function renderTasks() {
@@ -42,8 +45,8 @@
             div.innerHTML = `
                 <span class="${task.completed ? 'completed' : ''}">${task.title}</span>
                 <div>
-                    <button onclick="toggleComplete(${task.id}, ${task.completed})">${task.completed ? 'Undo' : 'Done'}</button>
-                    <button onclick="editTask(${task.id}, '${task.title.replace(/'/g, "\\'")}')">Edit</button>
+                    <button onclick="toggleComplete(${task.id})">${task.completed ? 'Undo' : 'Done'}</button>
+                    <button onclick="editTask(${task.id})">Edit</button>
                     <button onclick="deleteTask(${task.id})" style="color:red">Delete</button>
                 </div>
             `;
@@ -52,53 +55,62 @@
         updateCounts();
     }
 
-    async function addTask() {
+    function addTask() {
         const title = document.getElementById("taskInput").value.trim();
         if (!title) return;
-        await fetch(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title, completed: false })
-        });
+
+        const newTask = {
+            id: Date.now(),
+            title,
+            completed: false
+        };
+
+        allTasks.push(newTask);
+        saveTasks();
+        loadTasks();
+
         document.getElementById("taskInput").value = "";
+    }
+
+    function toggleComplete(id) {
+        allTasks = allTasks.map(task =>
+            task.id === id ? { ...task, completed: !task.completed } : task
+        );
+        saveTasks();
         loadTasks();
     }
 
-    async function toggleComplete(id, completed) {
-        await fetch(`${API_URL}/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ completed: !completed })
-        });
-        loadTasks();
-    }
-
-    async function editTask(id, oldTitle) {
-        const newTitle = prompt("Edit task:", oldTitle);
+    function editTask(id) {
+        const task = allTasks.find(t => t.id === id);
+        const newTitle = prompt("Edit task:", task.title);
         if (!newTitle || !newTitle.trim()) return;
-        await fetch(`${API_URL}/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: newTitle })
-        });
+
+        task.title = newTitle.trim();
+        saveTasks();
         loadTasks();
     }
 
-    async function deleteTask(id) {
-        await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+    function deleteTask(id) {
+        allTasks = allTasks.filter(task => task.id !== id);
+        saveTasks();
         loadTasks();
     }
 
-    function toggleDark() { document.body.classList.toggle("dark"); }
+    function toggleDark() {
+        document.body.classList.toggle("dark");
+    }
 
     function updateCounts() {
         const total = allTasks.length;
         const completed = allTasks.filter(t => t.completed).length;
         const pending = total - completed;
-        document.getElementById("counts").innerText = `Total: ${total} | Completed: ${completed} | Pending: ${pending}`;
+
+        document.getElementById("counts").innerText =
+            `Total: ${total} | Completed: ${completed} | Pending: ${pending}`;
     }
 
     loadTasks();
 </script>
 </body>
 </html>
+
